@@ -1,64 +1,54 @@
-import sqlite3
-from typing import Optional
-from dataclasses import dataclass
-from contextlib import contextmanager
+# firebase_setup.py
+import firebase_admin
+from firebase_admin import credentials, firestore
 
-@dataclass
-class Car:
-    vin: str
-    make: str
-    model: str
-    year: int
+# Initialize Firebase Admin SDK
+cred = credentials.Certificate('talktuadoctor-firebase-adminsdk.json')  # Path to your downloaded JSON key
+firebase_admin.initialize_app(cred)
 
-class DatabaseDriver:
-    def __init__(self, db_path: str = "auto_db.sqlite"):
-        self.db_path = db_path
-        self._init_db()
+# Initialize Firestore
+db = firestore.client()
 
-    @contextmanager
-    def _get_connection(self):
-        conn = sqlite3.connect(self.db_path)
-        try:
-            yield conn
-        finally:
-            conn.close()
+def add_patient(patient_data):
+   
+    try:
+        # Create or update the document in the "patients" collection using patientId as the document ID.
+        db.collection('patients').document(patient_data['patientId']).set(patient_data)
+        print(f"Patient {patient_data['patientId']} added successfully!")
+    except Exception as e:
+        print("Error adding patient:", e)
 
-    def _init_db(self):
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            
-            # Create cars table
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS cars (
-                    vin TEXT PRIMARY KEY,
-                    make TEXT NOT NULL,
-                    model TEXT NOT NULL,
-                    year INTEGER NOT NULL
-                )
-            """)
-            conn.commit()
+def get_patient(patient_id):
+   
+    try:
+        doc_ref = db.collection('patients').document(patient_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            print(f"Patient {patient_id} found:")
+            return doc.to_dict()
+        else:
+            print(f"No patient found with ID: {patient_id}")
+            return None
+    except Exception as e:
+        print("Error retrieving patient:", e)
+        return None
 
-    def create_car(self, vin: str, make: str, model: str, year: int) -> Car:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "INSERT INTO cars (vin, make, model, year) VALUES (?, ?, ?, ?)",
-                (vin, make, model, year)
-            )
-            conn.commit()
-            return Car(vin=vin, make=make, model=model, year=year)
+def collect_patient_info(patientId, firstName, lastName, phoneNumber, dateOfBirth, knownSymptoms, currentMedications=None):
+    patient_data = {
+        "patientId": patientId,
+        "firstName": firstName,
+        "lastName": lastName,
+        "phoneNumber": phoneNumber,
+        "dateOfBirth": dateOfBirth,
+        "knownSymptoms": knownSymptoms.split(",") if isinstance(knownSymptoms, str) else knownSymptoms,
+        "currentMedications": currentMedications if currentMedications else None
+    }
+    db.collection('patients').document(patientId).set(patient_data)
+    return patient_data
 
-    def get_car_by_vin(self, vin: str) -> Optional[Car]:
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM cars WHERE vin = ?", (vin,))
-            row = cursor.fetchone()
-            if not row:
-                return None
-            
-            return Car(
-                vin=row[0],
-                make=row[1],
-                model=row[2],
-                year=row[3]
-            )
+def find_patient_by_name_dob(firstName, lastName, dateOfBirth):
+    """
+    Finds a patient by first name, last name, and date of birth.
+    """
+    query = db.collection('patients').where('firstName', '==', firstName).where('lastName', '==', lastName).where('dateOfBirth', '==', dateOfBirth)
+    results = query.get()

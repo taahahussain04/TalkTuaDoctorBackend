@@ -2,85 +2,132 @@ from livekit.agents import llm
 import enum
 from typing import Annotated
 import logging
-from db_driver import DatabaseDriver
 
-logger = logging.getLogger("user-data")
+from db_driver import db
+
+logger = logging.getLogger("patient-data")
 logger.setLevel(logging.INFO)
 
-DB = DatabaseDriver()
+# Define an enum for patient details keys.
+class PatientDetails(enum.Enum):
+    PATIENT_ID = "patientId"
+    FIRST_NAME = "firstName"
+    LAST_NAME = "lastName"
+    PHONE_NUMBER = "phoneNumber"
+    DATE_OF_BIRTH = "dateOfBirth"
+    KNOWN_SYMPTOMS = "knownSymptoms"
+    CURRENT_MEDICATIONS = "currentMedications"
 
-class CarDetails(enum.Enum):
-    VIN = "vin"
-    Make = "make"
-    Model = "model"
-    Year = "year"
-    
-
-class AssistantFnc(llm.FunctionContext):
+class AssistantFunc(llm.FunctionContext):
     def __init__(self):
         super().__init__()
-        
-        self._car_details = {
-            CarDetails.VIN: "",
-            CarDetails.Make: "",
-            CarDetails.Model: "",
-            CarDetails.Year: ""
+        self._patient_details = {
+            PatientDetails.PATIENT_ID: "",
+            PatientDetails.FIRST_NAME: "",
+            PatientDetails.LAST_NAME: "",
+            PatientDetails.PHONE_NUMBER: "",
+            PatientDetails.DATE_OF_BIRTH: "",
+            PatientDetails.KNOWN_SYMPTOMS: "",
+            PatientDetails.CURRENT_MEDICATIONS: ""
         }
     
-    def get_car_str(self):
-        car_str = ""
-        for key, value in self._car_details.items():
-            car_str += f"{key}: {value}\n"
-            
-        return car_str
+    def get_patient_str(self):
+        """Generate a formatted string of the patient details."""
+        patient_str = ""
+        for key, value in self._patient_details.items():
+            patient_str += f"{key.value}: {value}\n"
+        return patient_str
     
-
-    # to make a function callable by the ai, we need to use the @llm.ai_callable decorator
-    # description is read by the model to determine if the function should be used or not
-    # annotated lets the model know the type and description of the parameter
-    @llm.ai_callable(description="lookup a car by its vin")
-    def lookup_car(self, vin: Annotated[str, llm.TypeInfo(description="The vin of the car to lookup")]):
-        logger.info("lookup car - vin: %s", vin)
+    @llm.ai_callable(description="Lookup a patient by their Patient ID")
+    def lookup_patient(self, patient_id: Annotated[str, llm.TypeInfo(description="The ID of the patient to lookup")]):
+        logger.info("Lookup patient - ID: %s", patient_id)
         
-        result = DB.get_car_by_vin(vin)
+        result = db.get_patient(patient_id)
         if result is None:
-            return "Car not found"
+            return "Patient not found"
         
-        self._car_details = {
-            CarDetails.VIN: result.vin,
-            CarDetails.Make: result.make,
-            CarDetails.Model: result.model,
-            CarDetails.Year: result.year
+        self._patient_details = {
+            PatientDetails.PATIENT_ID: result.get("patientId", ""),
+            PatientDetails.FIRST_NAME: result.get("firstName", ""),
+            PatientDetails.LAST_NAME: result.get("lastName", ""),
+            PatientDetails.PHONE_NUMBER: result.get("phoneNumber", ""),
+            PatientDetails.DATE_OF_BIRTH: result.get("dateOfBirth", ""),
+            PatientDetails.KNOWN_SYMPTOMS: ", ".join(result.get("knownSymptoms", [])) if result.get("knownSymptoms") else "",
+            PatientDetails.CURRENT_MEDICATIONS: result.get("currentMedications", "")
         }
         
-        return f"The car details are: {self.get_car_str()}"
+        return f"The patient details are:\n{self.get_patient_str()}"
     
-    @llm.ai_callable(description="get the details of the current car")
-    def get_car_details(self):
-        logger.info("get car  details")
-        return f"The car details are: {self.get_car_str()}"
+    @llm.ai_callable(description="Get the details of the current patient")
+    def get_patient_details(self):
+        logger.info("Retrieve current patient details")
+        return f"The patient details are:\n{self.get_patient_str()}"
     
-    @llm.ai_callable(description="create a new car")
-    def create_car(
+    @llm.ai_callable(description="Create a new patient profile")
+    def create_patient(
         self, 
-        vin: Annotated[str, llm.TypeInfo(description="The vin of the car")],
-        make: Annotated[str, llm.TypeInfo(description="The make of the car ")],
-        model: Annotated[str, llm.TypeInfo(description="The model of the car")],
-        year: Annotated[int, llm.TypeInfo(description="The year of the car")]
+        patient_id: Annotated[str, llm.TypeInfo(description="The unique Patient ID")],
+        first_name: Annotated[str, llm.TypeInfo(description="The first name of the patient")],
+        last_name: Annotated[str, llm.TypeInfo(description="The last name of the patient")],
+        phone_number: Annotated[str, llm.TypeInfo(description="The phone number of the patient")],
+        date_of_birth: Annotated[str, llm.TypeInfo(description="The date of birth of the patient (YYYY-MM-DD)")],
+        known_symptoms: Annotated[str, llm.TypeInfo(description="Known symptoms (comma-separated)")],
+        current_medications: Annotated[str, llm.TypeInfo(description="Current medications (optional)")]=None
     ):
-        logger.info("create car - vin: %s, make: %s, model: %s, year: %s", vin, make, model, year)
-        result = DB.create_car(vin, make, model, year)
-        if result is None:
-            return "Failed to create car"
+        logger.info("Create patient - ID: %s, Name: %s %s", patient_id, first_name, last_name)
+        # Convert the comma-separated symptoms string into a list.
+        symptoms_list = [symptom.strip() for symptom in known_symptoms.split(",")] if known_symptoms else []
         
-        self._car_details = {
-            CarDetails.VIN: result.vin,
-            CarDetails.Make: result.make,
-            CarDetails.Model: result.model,
-            CarDetails.Year: result.year
+        patient_data = {
+            "patientId": patient_id,
+            "firstName": first_name,
+            "lastName": last_name,
+            "phoneNumber": phone_number,
+            "dateOfBirth": date_of_birth,
+            "knownSymptoms": symptoms_list,
+            "currentMedications": current_medications
         }
         
-        return "car created!"
+        # Add the patient to the database.
+        db.add_patient(patient_data)
+        
+        self._patient_details = {
+            PatientDetails.PATIENT_ID: patient_data.get("patientId", ""),
+            PatientDetails.FIRST_NAME: patient_data.get("firstName", ""),
+            PatientDetails.LAST_NAME: patient_data.get("lastName", ""),
+            PatientDetails.PHONE_NUMBER: patient_data.get("phoneNumber", ""),
+            PatientDetails.DATE_OF_BIRTH: patient_data.get("dateOfBirth", ""),
+            PatientDetails.KNOWN_SYMPTOMS: ", ".join(patient_data.get("knownSymptoms", [])),
+            PatientDetails.CURRENT_MEDICATIONS: patient_data.get("currentMedications", "")
+        }
+        
+        return "Patient profile created successfully!"
     
-    def has_car(self):
-        return self._car_details[CarDetails.VIN] != ""
+    @llm.ai_callable(description="Find a patient by name and date of birth")
+    def find_patient_by_name_dob(
+        self,
+        first_name: Annotated[str, llm.TypeInfo(description="The first name of the patient")],
+        last_name: Annotated[str, llm.TypeInfo(description="The last name of the patient")],
+        date_of_birth: Annotated[str, llm.TypeInfo(description="The date of birth of the patient (YYYY-MM-DD)")],
+    ):
+        logger.info("Find patient - Name: %s %s, DOB: %s", first_name, last_name, date_of_birth)
+        # Assume there is a corresponding function in the db module to find a patient by name and DOB.
+        result = db.find_patient_by_name_dob(first_name, last_name, date_of_birth)
+        if result is None:
+            return "Patient not found"
+        
+        self._patient_details = {
+            PatientDetails.PATIENT_ID: result.get("patientId", ""),
+            PatientDetails.FIRST_NAME: result.get("firstName", ""),
+            PatientDetails.LAST_NAME: result.get("lastName", ""),
+            PatientDetails.PHONE_NUMBER: result.get("phoneNumber", ""),
+            PatientDetails.DATE_OF_BIRTH: result.get("dateOfBirth", ""),
+            PatientDetails.KNOWN_SYMPTOMS: ", ".join(result.get("knownSymptoms", [])) if result.get("knownSymptoms") else "",
+            PatientDetails.CURRENT_MEDICATIONS: result.get("currentMedications", "")
+        }
+        
+        return f"Patient found:\n{self.get_patient_str()}"
+    
+    def has_patient(self):
+        """Check if the current profile has a valid Patient ID."""
+        return self._patient_details[PatientDetails.PATIENT_ID] != ""
