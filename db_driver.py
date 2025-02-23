@@ -10,7 +10,6 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 def add_patient(patient_data):
-   
     try:
         # Create or update the document in the "patients" collection using patientId as the document ID.
         db.collection('patients').document(patient_data['patientId']).set(patient_data)

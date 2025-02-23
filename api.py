@@ -3,7 +3,7 @@ import enum
 from typing import Annotated
 import logging
 
-from db_driver import db
+from db_driver import db, add_patient
 
 logger = logging.getLogger("patient-data")
 logger.setLevel(logging.INFO)
@@ -89,7 +89,7 @@ class AssistantFunc(llm.FunctionContext):
         }
         
         # Add the patient to the database.
-        db.add_patient(patient_data)
+        add_patient(patient_data)
         
         self._patient_details = {
             PatientDetails.PATIENT_ID: patient_data.get("patientId", ""),
