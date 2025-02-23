@@ -3,7 +3,7 @@ import enum
 from typing import Annotated
 import logging
 
-from db_driver import db, add_patient, find_patient_by_name_dob, get_patient, add_appointment
+from db_driver import db, add_patient, get_patient, find_patient_by_name_dob, add_appointment
 
 logger = logging.getLogger("patient-data")
 logger.setLevel(logging.INFO)

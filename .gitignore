@@ -5,3 +5,4 @@ ai/
 pycache/
 .DS_Store
 __pycache__/
+phi/
