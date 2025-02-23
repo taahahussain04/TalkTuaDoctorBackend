@@ -51,3 +51,30 @@ def find_patient_by_name_dob(firstName, lastName, dateOfBirth):
     """
     query = db.collection('patients').where('firstName', '==', firstName).where('lastName', '==', lastName).where('dateOfBirth', '==', dateOfBirth)
     results = query.get()
+
+def add_appointment(patient_id, appointment_data):
+    try:
+        # Get the patient document reference
+        patient_ref = db.collection('patients').document(patient_id)
+        
+        # Get the current appointments array or create a new one
+        patient_doc = patient_ref.get()
+        if patient_doc.exists:
+            current_data = patient_doc.to_dict()
+            appointments = current_data.get('appointments', [])
+            
+            # Add the new appointment
+            appointments.append(appointment_data)
+            
+            # Update the patient document with the new appointments array
+            patient_ref.update({'appointments': appointments})
+            
+            print(f"Appointment added successfully for patient {patient_id}")
+            return True
+        else:
+            print(f"No patient found with ID: {patient_id}")
+            return False
+            
+    except Exception as e:
+        print("Error adding appointment:", e)
+        return False

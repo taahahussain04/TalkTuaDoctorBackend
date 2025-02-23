@@ -3,7 +3,7 @@ import enum
 from typing import Annotated
 import logging
 
-from db_driver import db, add_patient
+from db_driver import db, add_patient, find_patient_by_name_dob, get_patient, add_appointment
 
 logger = logging.getLogger("patient-data")
 logger.setLevel(logging.INFO)
@@ -42,7 +42,7 @@ class AssistantFunc(llm.FunctionContext):
     def lookup_patient(self, patient_id: Annotated[str, llm.TypeInfo(description="The ID of the patient to lookup")]):
         logger.info("Lookup patient - ID: %s", patient_id)
         
-        result = db.get_patient(patient_id)
+        result = get_patient(patient_id)
         if result is None:
             return "Patient not found"
         
@@ -112,7 +112,7 @@ class AssistantFunc(llm.FunctionContext):
     ):
         logger.info("Find patient - Name: %s %s, DOB: %s", first_name, last_name, date_of_birth)
         # Assume there is a corresponding function in the db module to find a patient by name and DOB.
-        result = db.find_patient_by_name_dob(first_name, last_name, date_of_birth)
+        result = find_patient_by_name_dob(first_name, last_name, date_of_birth)
         if result is None:
             return "Patient not found"
         
@@ -131,3 +131,28 @@ class AssistantFunc(llm.FunctionContext):
     def has_patient(self):
         """Check if the current profile has a valid Patient ID."""
         return self._patient_details[PatientDetails.PATIENT_ID] != ""
+    
+    @llm.ai_callable(description="Create a new appointment for the current patient")
+    def create_appointment(
+        self,
+        date: Annotated[str, llm.TypeInfo(description="The appointment date (YYYY-MM-DD)")],
+        time: Annotated[str, llm.TypeInfo(description="The appointment time (HH:MM)")],
+        reason: Annotated[str, llm.TypeInfo(description="The reason for the appointment")],
+        notes: Annotated[str, llm.TypeInfo(description="Additional notes for the appointment (optional)")]=None
+    ):
+        logger.info("Create appointment for patient ID: %s", self._patient_details[PatientDetails.PATIENT_ID])
+        
+        if not self.has_patient():
+            return "Error: No patient selected. Please lookup or create a patient first."
+            
+        appointment_data = {
+            "date": date,
+            "time": time,
+            "reason": reason,
+            "notes": notes
+        }
+        
+        # Add the appointment to the database
+        add_appointment(self._patient_details[PatientDetails.PATIENT_ID], appointment_data)
+        
+        return f"Appointment successfully created for {self._patient_details[PatientDetails.FIRST_NAME]} {self._patient_details[PatientDetails.LAST_NAME]} on {date} at {time}"

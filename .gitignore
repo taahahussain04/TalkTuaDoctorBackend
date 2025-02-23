@@ -3,3 +3,5 @@ talktuadoctor-firebase-adminsdk.json
 venv/
 ai/
 pycache/
+.DS_Store
+__pycache__/
