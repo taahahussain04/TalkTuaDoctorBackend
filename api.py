@@ -4,6 +4,7 @@ from typing import Annotated
 import logging
 
 from db_driver import db, add_patient, get_patient, find_patient_by_name_dob, add_appointment
+from ai_agent import get_research_agent_response  # Add this import at the top
 
 logger = logging.getLogger("patient-data")
 logger.setLevel(logging.INFO)
@@ -156,3 +157,25 @@ class AssistantFunc(llm.FunctionContext):
         add_appointment(self._patient_details[PatientDetails.PATIENT_ID], appointment_data)
         
         return f"Appointment successfully created for {self._patient_details[PatientDetails.FIRST_NAME]} {self._patient_details[PatientDetails.LAST_NAME]} on {date} at {time}"
+    
+    @llm.ai_callable(description="Research symptoms and provide medical insights")
+    def research_symptoms(self, symptoms: Annotated[str, llm.TypeInfo(description="The symptoms described by the patient")]):
+        logger.info("Researching symptoms: %s", symptoms)
+        
+        # Get research insights about the symptoms
+        research_response = get_research_agent_response(symptoms)
+        
+        # Update the patient's known symptoms if we have an active patient
+        if self.has_patient():
+            current_symptoms = self._patient_details[PatientDetails.KNOWN_SYMPTOMS]
+            if current_symptoms:
+                self._patient_details[PatientDetails.KNOWN_SYMPTOMS] = f"{current_symptoms}, {symptoms}"
+            else:
+                self._patient_details[PatientDetails.KNOWN_SYMPTOMS] = symptoms
+            
+            # Log the updated symptoms
+            logger.info("Updated symptoms for patient %s: %s", 
+                       self._patient_details[PatientDetails.PATIENT_ID], 
+                       self._patient_details[PatientDetails.KNOWN_SYMPTOMS])
+        
+        return research_response

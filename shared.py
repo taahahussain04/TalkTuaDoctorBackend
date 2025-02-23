@@ -1,10 +1,7 @@
+from phi.vectordb.pineconedb import PineconeDB
 from phi.knowledge.website import WebsiteKnowledgeBase
 from ai_agent import get_google_search_agent
 import os
-import typer
-from typing import Optional
-from rich.prompt import Prompt
-from phi.vectordb.pineconedb import PineconeDB
 
 api_key = os.getenv("PINECONE_API_KEY")
 index_name = "thai-recipe-hybrid-search"
@@ -26,4 +23,3 @@ def create_and_update_knowledge_base(query: str) -> WebsiteKnowledgeBase:
     )
     knowledge_base.update()
     return knowledge_base
-
