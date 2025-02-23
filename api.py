@@ -3,7 +3,7 @@ import enum
 from typing import Annotated
 import logging
 
-from db_driver import db, add_patient
+from db_driver import db, add_patient, get_patient, find_patient_by_name_dob
 
 logger = logging.getLogger("patient-data")
 logger.setLevel(logging.INFO)
@@ -42,7 +42,7 @@ class AssistantFunc(llm.FunctionContext):
     def lookup_patient(self, patient_id: Annotated[str, llm.TypeInfo(description="The ID of the patient to lookup")]):
         logger.info("Lookup patient - ID: %s", patient_id)
         
-        result = db.get_patient(patient_id)
+        result = get_patient(patient_id)
         if result is None:
             return "Patient not found"
         
@@ -112,7 +112,7 @@ class AssistantFunc(llm.FunctionContext):
     ):
         logger.info("Find patient - Name: %s %s, DOB: %s", first_name, last_name, date_of_birth)
         # Assume there is a corresponding function in the db module to find a patient by name and DOB.
-        result = db.find_patient_by_name_dob(first_name, last_name, date_of_birth)
+        result = find_patient_by_name_dob(first_name, last_name, date_of_birth)
         if result is None:
             return "Patient not found"
         
