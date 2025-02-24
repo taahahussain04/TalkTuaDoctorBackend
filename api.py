@@ -68,7 +68,7 @@ class AssistantFunc(llm.FunctionContext):
     @llm.ai_callable(description="Create a new patient profile")
     def create_patient(
         self, 
-        patient_id: Annotated[str, llm.TypeInfo(description="The unique Patient ID")],
+        patient_id: Annotated[str, llm.TypeInfo(description="The unique Patient ID. It should be a 5 digit number")],
         first_name: Annotated[str, llm.TypeInfo(description="The first name of the patient")],
         last_name: Annotated[str, llm.TypeInfo(description="The last name of the patient")],
         phone_number: Annotated[str, llm.TypeInfo(description="The phone number of the patient")],
